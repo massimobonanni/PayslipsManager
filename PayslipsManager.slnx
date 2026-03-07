@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PayslipsManager.Application/PayslipsManager.Application.csproj" />
+    <Project Path="src/PayslipsManager.Domain/PayslipsManager.Domain.csproj" />
+    <Project Path="src/PayslipsManager.Functions/PayslipsManager.Functions.csproj" />
+    <Project Path="src/PayslipsManager.Infrastructure/PayslipsManager.Infrastructure.csproj" />
+    <Project Path="src/PayslipsManager.Web/PayslipsManager.Web.csproj" />
+  </Folder>
+</Solution>
