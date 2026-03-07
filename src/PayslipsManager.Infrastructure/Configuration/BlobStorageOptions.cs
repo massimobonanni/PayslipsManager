@@ -8,22 +8,22 @@ public class BlobStorageOptions
     public const string SectionName = "BlobStorage";
 
     /// <summary>
-    /// Storage account connection string or service URL.
+    /// Storage account service URL (e.g. https://mystorageaccount.blob.core.windows.net).
     /// </summary>
     public string AccountUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Container name for storing payslips.
+    /// Prefix for employee containers. Each employee container is named {ContainerPrefix}-{employeeId}.
     /// </summary>
-    public string ContainerName { get; set; } = "payslips";
+    public string ContainerPrefix { get; set; } = "payslips";
 
     /// <summary>
-    /// Use managed identity for authentication.
+    /// Use managed identity (DefaultAzureCredential) for authentication.
     /// </summary>
     public bool UseManagedIdentity { get; set; } = true;
 
     /// <summary>
-    /// Connection string (if not using managed identity).
+    /// Connection string for local development only. Do not use in production.
     /// </summary>
     public string? ConnectionString { get; set; }
 }

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
 using Microsoft.Identity.Web.UI;
+using PayslipsManager.Application.Interfaces;
 using PayslipsManager.Infrastructure;
+using PayslipsManager.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +45,10 @@ builder.Services.AddControllersWithViews()
 
 // Add Infrastructure services (includes repository and application services)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Add employee context service (resolves signed-in employee from Entra claims)
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IEmployeeContextService, EmployeeContextService>();
 
 // Add logging
 builder.Logging.AddConsole();
