@@ -10,7 +10,9 @@ public interface IPayslipEventProcessor
 {
     /// <summary>
     /// Handles a newly uploaded payslip blob.
-    /// Validates the blob name and content type, then sets blob index tags.
+    /// Validates the blob name and extension, checks for idempotency, then sets blob index tags.
     /// </summary>
-    Task<PayslipValidationResult> ProcessNewPayslipAsync(string employeeId, string blobName, Stream content, CancellationToken cancellationToken = default);
+    Task<PayslipValidationResult> ProcessNewPayslipAsync(
+        string employeeId, string blobName,
+        CancellationToken cancellationToken = default);
 }
