@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PayslipsManager.Web.Models;
 
@@ -50,6 +51,12 @@ public class HomeController : Controller
         await HttpContext.SignInAsync("Cookies", claimsPrincipal);
 
         return RedirectToAction("Index", "Payslips");
+    }
+
+    [AllowAnonymous]
+    public IActionResult AccessDenied()
+    {
+        return View();
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

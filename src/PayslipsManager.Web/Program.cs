@@ -26,6 +26,10 @@ if (!bypassAuth)
     {
         options.FallbackPolicy = options.DefaultPolicy;
     });
+
+    builder.Services.Configure<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>(
+        Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme,
+        options => options.AccessDeniedPath = "/Home/AccessDenied");
 }
 else
 {
@@ -34,6 +38,7 @@ else
         .AddCookie("Cookies", options =>
         {
             options.LoginPath = "/Home/DevLogin";
+            options.AccessDeniedPath = "/Home/AccessDenied";
         });
     
     builder.Services.AddAuthorization();

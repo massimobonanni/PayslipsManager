@@ -68,6 +68,21 @@ public class PayslipsController : Controller
 
         _logger.LogInformation("Employee {EmployeeId} downloading payslip {BlobName}", employeeId, id);
 
+        // Check if the payslip is archived before attempting download
+        var payslip = await _queryService.GetPayslipDetailsAsync(employeeId, id, cancellationToken);
+        if (payslip == null)
+        {
+            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
+            return NotFound();
+        }
+
+        if (payslip.IsArchived)
+        {
+            _logger.LogWarning("Employee {EmployeeId} attempted to download archived payslip {BlobName}", employeeId, id);
+            TempData["Error"] = "This payslip is in the Archive tier and cannot be downloaded directly. A restore is required before the file becomes available.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         var stream = await _downloadService.DownloadAsync(employeeId, id, cancellationToken);
 
         if (stream == null)

@@ -10,26 +10,32 @@
                 <i class="bi bi-file-earmark-text"></i> My Payslips
             </h1>
             
-            <div class="alert alert-info">
-                <strong>Welcome, @ViewData["UserName"]!</strong><br />
-                Signed in as: <strong>@ViewData["UserEmail"]</strong>
+            <div class="alert alert-info d-flex align-items-center">
+                <i class="bi bi-person-badge me-2" style="font-size: 1.4rem;"></i>
+                <div>
+                    <strong>@ViewData["UserName"]</strong>
+                    <span class="text-muted ms-2">@ViewData["UserEmail"]</span>
+                </div>
             </div>
 
             @if (Model != null && Model.Count > 0)
             {
-                <div class="card">
+                <div class="card shadow-sm">
                     <div class="card-body">
-                        <p class="text-muted">You have <strong>@Model.Count</strong> payslip(s) available.</p>
+                        <p class="text-muted mb-3">
+                            <i class="bi bi-collection"></i> <strong>@Model.Count</strong> payslip(s) available
+                        </p>
                         
                         <div class="table-responsive">
-                            <table class="table table-striped table-hover">
+                            <table class="table table-striped table-hover align-middle mb-0">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Period</th>
                                         <th>File Name</th>
                                         <th>Uploaded</th>
                                         <th>Access Tier</th>
-                                        <th>Actions</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -40,22 +46,44 @@
                                             <td>@payslip.FileName</td>
                                             <td>@payslip.UploadedOn.ToString("yyyy-MM-dd HH:mm")</td>
                                             <td>
-                                                <span class="badge bg-@(payslip.AccessTier == "Hot" ? "danger" : payslip.AccessTier == "Cool" ? "info" : "secondary")">
+                                                <span class="badge bg-@(payslip.AccessTier == "Hot" ? "success" : payslip.AccessTier == "Cool" ? "info" : "secondary")">
                                                     @payslip.AccessTier
                                                 </span>
-                                                @if (payslip.IsArchived)
-                                                {
-                                                    <span class="badge bg-warning text-dark">Archived</span>
-                                                }
                                             </td>
                                             <td>
+                                                @if (payslip.IsArchived)
+                                                {
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="bi bi-archive"></i> Restore required
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-success">
+                                                        <i class="bi bi-check-circle"></i> Available
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td class="text-end">
                                                 <div class="btn-group" role="group">
-                                                    <a asp-action="Details" asp-route-id="@payslip.BlobName" class="btn btn-sm btn-info" title="View Details">
+                                                    <a asp-action="Details" asp-route-id="@payslip.BlobName"
+                                                       class="btn btn-sm btn-outline-primary" title="View Details">
                                                         <i class="bi bi-info-circle"></i> Details
                                                     </a>
-                                                    <a asp-action="Download" asp-route-id="@payslip.BlobName" class="btn btn-sm btn-primary" title="Download PDF">
-                                                        <i class="bi bi-download"></i> Download
-                                                    </a>
+                                                    @if (payslip.IsArchived)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-secondary" disabled
+                                                                title="This payslip is archived and must be restored before download">
+                                                            <i class="bi bi-archive"></i> Archived
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <a asp-action="Download" asp-route-id="@payslip.BlobName"
+                                                           class="btn btn-sm btn-primary" title="Download PDF">
+                                                            <i class="bi bi-download"></i> Download
+                                                        </a>
+                                                    }
                                                 </div>
                                             </td>
                                         </tr>
@@ -68,15 +96,14 @@
             }
             else
             {
-                <div class="alert alert-warning">
-                    <h4 class="alert-heading">No Payslips Found</h4>
-                    <p>You don't have any payslips available at the moment. Please contact HR if you believe this is an error.</p>
+                <div class="card shadow-sm border-warning">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem; color: #6c757d;"></i>
+                        <h4 class="mt-3">No Payslips Found</h4>
+                        <p class="text-muted">You don't have any payslips available at the moment.<br/>Please contact HR if you believe this is an error.</p>
+                    </div>
                 </div>
             }
         </div>
     </div>
 </div>
-
-@section Styles {
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-}
