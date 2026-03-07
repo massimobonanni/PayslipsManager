@@ -20,11 +20,12 @@ public static class DependencyInjection
         // Configure options
         services.Configure<BlobStorageOptions>(configuration.GetSection(BlobStorageOptions.SectionName));
 
-        // Register repositories
-        services.AddSingleton<IPayslipRepository, BlobPayslipRepository>();
+        // Register storage
+        services.AddSingleton<IPayslipStorageService, BlobPayslipRepository>();
 
         // Register application services
-        services.AddScoped<IPayslipService, PayslipService>();
+        services.AddScoped<IPayslipQueryService, PayslipService>();
+        services.AddScoped<IPayslipDownloadService>(sp => (PayslipService)sp.GetRequiredService<IPayslipQueryService>());
 
         return services;
     }

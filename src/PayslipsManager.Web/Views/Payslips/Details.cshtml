@@ -1,4 +1,4 @@
-@model PayslipsManager.Application.DTOs.PayslipDto
+@model PayslipsManager.Application.DTOs.PayslipDetailsDto
 @{
     ViewData["Title"] = $"Payslip Details - {Model.Period}";
 }
@@ -24,51 +24,21 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <h5>Employee Information</h5>
-                            <dl class="row">
-                                <dt class="col-sm-4">Name:</dt>
-                                <dd class="col-sm-8">@Model.EmployeeName</dd>
-
-                                <dt class="col-sm-4">Email:</dt>
-                                <dd class="col-sm-8">@Model.EmployeeEmail</dd>
-
-                                <dt class="col-sm-4">Employee ID:</dt>
-                                <dd class="col-sm-8">@Model.EmployeeId</dd>
-                            </dl>
-                        </div>
-
-                        <div class="col-md-6">
                             <h5>Document Information</h5>
                             <dl class="row">
-                                <dt class="col-sm-4">Year:</dt>
-                                <dd class="col-sm-8">@Model.Year</dd>
+                                <dt class="col-sm-4">File Name:</dt>
+                                <dd class="col-sm-8">@Model.FileName</dd>
 
-                                <dt class="col-sm-4">Month:</dt>
-                                <dd class="col-sm-8">@Model.Month</dd>
-
-                                <dt class="col-sm-4">File Size:</dt>
-                                <dd class="col-sm-8">@Model.FileSizeFormatted (@Model.FileSizeBytes bytes)</dd>
+                                <dt class="col-sm-4">Content Type:</dt>
+                                <dd class="col-sm-8">@Model.ContentType</dd>
 
                                 <dt class="col-sm-4">Uploaded:</dt>
-                                <dd class="col-sm-8">@Model.UploadedAt.ToString("yyyy-MM-dd HH:mm:ss")</dd>
-
-                                @if (Model.LastAccessedAt.HasValue)
-                                {
-                                    <dt class="col-sm-4">Last Accessed:</dt>
-                                    <dd class="col-sm-8">@Model.LastAccessedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</dd>
-                                }
+                                <dd class="col-sm-8">@Model.UploadedOn.ToString("yyyy-MM-dd HH:mm:ss")</dd>
 
                                 <dt class="col-sm-4">Access Tier:</dt>
                                 <dd class="col-sm-8">
                                     <span class="badge bg-@(Model.AccessTier == "Hot" ? "danger" : Model.AccessTier == "Cool" ? "info" : "secondary")">
                                         @Model.AccessTier
-                                    </span>
-                                </dd>
-
-                                <dt class="col-sm-4">Status:</dt>
-                                <dd class="col-sm-8">
-                                    <span class="badge bg-@(Model.Status == "Available" ? "success" : "warning")">
-                                        @Model.Status
                                     </span>
                                 </dd>
                             </dl>
@@ -78,7 +48,7 @@
                     <hr />
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-start">
-                        <a asp-action="Download" asp-route-id="@Model.Id" class="btn btn-primary btn-lg">
+                        <a asp-action="Download" asp-route-id="@Model.BlobName" class="btn btn-primary btn-lg">
                             <i class="bi bi-download"></i> Download PDF
                         </a>
                         <a asp-action="Index" class="btn btn-secondary btn-lg">
@@ -88,11 +58,11 @@
                 </div>
             </div>
 
-            @if (Model.AccessTier == "Archive")
+            @if (Model.ArchiveWarning != null)
             {
                 <div class="alert alert-warning mt-3">
                     <h5 class="alert-heading">Archived Document</h5>
-                    <p>This payslip is stored in the <strong>Archive</strong> tier. Downloading may take longer and additional costs may apply.</p>
+                    <p>@Model.ArchiveWarning.Message</p>
                 </div>
             }
         </div>

@@ -2,167 +2,115 @@ using Microsoft.Extensions.Logging;
 using PayslipsManager.Application.DTOs;
 using PayslipsManager.Application.Interfaces;
 using PayslipsManager.Domain.Entities;
+using PayslipsManager.Domain.Enums;
 
 namespace PayslipsManager.Application.Services;
 
 /// <summary>
-/// Application service for managing payslips.
+/// Implements query and download operations for payslips.
 /// </summary>
-public class PayslipService : IPayslipService
+public class PayslipService : IPayslipQueryService, IPayslipDownloadService
 {
-    private readonly IPayslipRepository _repository;
+    private readonly IPayslipStorageService _storage;
     private readonly ILogger<PayslipService> _logger;
 
-    public PayslipService(IPayslipRepository repository, ILogger<PayslipService> logger)
+    public PayslipService(IPayslipStorageService storage, ILogger<PayslipService> logger)
     {
-        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<IEnumerable<PayslipDto>> GetPayslipsForEmployeeAsync(string employeeEmail, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<PayslipListItemDto>> GetPayslipsForEmployeeAsync(string employeeId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(employeeEmail))
-        {
-            throw new ArgumentException("Employee email cannot be null or empty.", nameof(employeeEmail));
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
 
-        _logger.LogInformation("Retrieving payslips for employee: {EmployeeEmail}", employeeEmail);
+        _logger.LogInformation("Retrieving payslips for employee {EmployeeId}", employeeId);
 
-        var payslips = await _repository.ListPayslipsAsync(employeeEmail, cancellationToken);
-        
-        return payslips.Select(MapToDto).OrderByDescending(p => p.Year).ThenByDescending(p => p.Month);
+        var documents = await _storage.ListPayslipsAsync(employeeId, cancellationToken);
+
+        return documents
+            .OrderByDescending(d => d.PayslipDate)
+            .Select(MapToListItem)
+            .ToList()
+            .AsReadOnly();
     }
 
-    public async Task<PayslipDto?> GetPayslipByIdAsync(string payslipId, string employeeEmail, CancellationToken cancellationToken = default)
+    public async Task<PayslipDetailsDto?> GetPayslipDetailsAsync(string employeeId, string blobName, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(payslipId))
+        ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
+
+        _logger.LogInformation("Retrieving payslip {BlobName} for employee {EmployeeId}", blobName, employeeId);
+
+        var doc = await _storage.GetPayslipAsync(employeeId, blobName, cancellationToken);
+        if (doc is null)
         {
-            throw new ArgumentException("Payslip ID cannot be null or empty.", nameof(payslipId));
-        }
-
-        if (string.IsNullOrWhiteSpace(employeeEmail))
-        {
-            throw new ArgumentException("Employee email cannot be null or empty.", nameof(employeeEmail));
-        }
-
-        _logger.LogInformation("Retrieving payslip {PayslipId} for employee: {EmployeeEmail}", payslipId, employeeEmail);
-
-        var payslip = await _repository.GetPayslipAsync(payslipId, cancellationToken);
-
-        if (payslip == null)
-        {
-            _logger.LogWarning("Payslip {PayslipId} not found", payslipId);
+            _logger.LogWarning("Payslip {BlobName} not found for employee {EmployeeId}", blobName, employeeId);
             return null;
         }
 
-        if (!payslip.BelongsTo(employeeEmail))
-        {
-            _logger.LogWarning("Unauthorized access attempt: Employee {EmployeeEmail} tried to access payslip {PayslipId} belonging to {Owner}",
-                employeeEmail, payslipId, payslip.EmployeeEmail);
-            return null;
-        }
-
-        await _repository.UpdateLastAccessedAsync(payslip.ContainerName, payslip.BlobName, cancellationToken);
-
-        return MapToDto(payslip);
+        return MapToDetails(doc);
     }
 
-    public async Task<Stream?> DownloadPayslipAsync(string payslipId, string employeeEmail, CancellationToken cancellationToken = default)
+    public async Task<Stream?> DownloadAsync(string employeeId, string blobName, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(payslipId))
-        {
-            throw new ArgumentException("Payslip ID cannot be null or empty.", nameof(payslipId));
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
 
-        if (string.IsNullOrWhiteSpace(employeeEmail))
-        {
-            throw new ArgumentException("Employee email cannot be null or empty.", nameof(employeeEmail));
-        }
+        _logger.LogInformation("Downloading payslip {BlobName} for employee {EmployeeId}", blobName, employeeId);
 
-        _logger.LogInformation("Downloading payslip {PayslipId} for employee: {EmployeeEmail}", payslipId, employeeEmail);
-
-        var payslip = await _repository.GetPayslipAsync(payslipId, cancellationToken);
-
-        if (payslip == null)
-        {
-            _logger.LogWarning("Payslip {PayslipId} not found", payslipId);
-            return null;
-        }
-
-        if (!payslip.BelongsTo(employeeEmail))
-        {
-            _logger.LogWarning("Unauthorized download attempt: Employee {EmployeeEmail} tried to download payslip {PayslipId}",
-                employeeEmail, payslipId);
-            return null;
-        }
-
-        await _repository.UpdateLastAccessedAsync(payslip.ContainerName, payslip.BlobName, cancellationToken);
-
-        return await _repository.DownloadPayslipContentAsync(payslip.ContainerName, payslip.BlobName, cancellationToken);
+        return await _storage.DownloadContentAsync(employeeId, blobName, cancellationToken);
     }
 
-    public async Task<string?> GetPayslipDownloadUrlAsync(string payslipId, string employeeEmail, TimeSpan validity, CancellationToken cancellationToken = default)
+    public async Task<string?> GenerateDownloadUrlAsync(string employeeId, string blobName, TimeSpan validity, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(payslipId))
-        {
-            throw new ArgumentException("Payslip ID cannot be null or empty.", nameof(payslipId));
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
 
-        if (string.IsNullOrWhiteSpace(employeeEmail))
-        {
-            throw new ArgumentException("Employee email cannot be null or empty.", nameof(employeeEmail));
-        }
+        _logger.LogInformation("Generating download URL for payslip {BlobName} for employee {EmployeeId}", blobName, employeeId);
 
-        _logger.LogInformation("Generating download URL for payslip {PayslipId} for employee: {EmployeeEmail}", payslipId, employeeEmail);
-
-        var payslip = await _repository.GetPayslipAsync(payslipId, cancellationToken);
-
-        if (payslip == null)
-        {
-            _logger.LogWarning("Payslip {PayslipId} not found", payslipId);
-            return null;
-        }
-
-        if (!payslip.BelongsTo(employeeEmail))
-        {
-            _logger.LogWarning("Unauthorized URL generation attempt: Employee {EmployeeEmail} tried to get URL for payslip {PayslipId}",
-                employeeEmail, payslipId);
-            return null;
-        }
-
-        return await _repository.GenerateSasUrlAsync(payslip.ContainerName, payslip.BlobName, validity, cancellationToken);
+        return await _storage.GenerateSasUrlAsync(employeeId, blobName, validity, cancellationToken);
     }
 
-    private static PayslipDto MapToDto(Payslip payslip)
+    // ── Mapping helpers ──────────────────────────────────────────────
+
+    private static PayslipListItemDto MapToListItem(PayslipDocument doc) => new()
     {
-        return new PayslipDto
+        BlobName = doc.BlobName,
+        FileName = doc.FileName,
+        PayslipDate = doc.PayslipDate,
+        Period = doc.GetPeriodDisplay(),
+        AccessTier = doc.AccessTier.ToString(),
+        IsArchived = doc.IsArchived,
+        UploadedOn = doc.UploadedOn
+    };
+
+    private static PayslipDetailsDto MapToDetails(PayslipDocument doc)
+    {
+        var dto = new PayslipDetailsDto
         {
-            Id = payslip.Id,
-            EmployeeId = payslip.EmployeeId,
-            EmployeeEmail = payslip.EmployeeEmail,
-            EmployeeName = payslip.EmployeeName,
-            Year = payslip.Year,
-            Month = payslip.Month,
-            Period = payslip.GetPeriodDisplay(),
-            FileSizeBytes = payslip.FileSizeBytes,
-            FileSizeFormatted = FormatFileSize(payslip.FileSizeBytes),
-            UploadedAt = payslip.UploadedAt,
-            LastAccessedAt = payslip.LastAccessedAt,
-            AccessTier = payslip.AccessTier,
-            Status = payslip.Status
+            BlobName = doc.BlobName,
+            FileName = doc.FileName,
+            EmployeeId = doc.EmployeeId,
+            PayslipDate = doc.PayslipDate,
+            Period = doc.GetPeriodDisplay(),
+            AccessTier = doc.AccessTier.ToString(),
+            IsArchived = doc.IsArchived,
+            UploadedOn = doc.UploadedOn,
+            ContentType = doc.ContentType,
+            Tags = doc.Tags
         };
-    }
 
-    private static string FormatFileSize(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
+        if (doc.IsArchived)
         {
-            order++;
-            len = len / 1024;
+            dto.ArchiveWarning = new ArchiveWarningDto
+            {
+                IsArchived = true,
+                CurrentTier = doc.AccessTier.ToString(),
+                Message = "This payslip is in the Archive tier. Downloading it may take several hours while the blob is rehydrated."
+            };
         }
-        return $"{len:0.##} {sizes[order]}";
+
+        return dto;
     }
 }

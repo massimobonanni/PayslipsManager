@@ -11,12 +11,17 @@ namespace PayslipsManager.Web.Controllers;
 [Authorize]
 public class PayslipsController : Controller
 {
-    private readonly IPayslipService _payslipService;
+    private readonly IPayslipQueryService _queryService;
+    private readonly IPayslipDownloadService _downloadService;
     private readonly ILogger<PayslipsController> _logger;
 
-    public PayslipsController(IPayslipService payslipService, ILogger<PayslipsController> logger)
+    public PayslipsController(
+        IPayslipQueryService queryService,
+        IPayslipDownloadService downloadService,
+        ILogger<PayslipsController> logger)
     {
-        _payslipService = payslipService ?? throw new ArgumentNullException(nameof(payslipService));
+        _queryService = queryService ?? throw new ArgumentNullException(nameof(queryService));
+        _downloadService = downloadService ?? throw new ArgumentNullException(nameof(downloadService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -26,20 +31,20 @@ public class PayslipsController : Controller
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        var userEmail = GetUserEmail();
-        if (string.IsNullOrEmpty(userEmail))
+        var employeeId = GetEmployeeId();
+        if (string.IsNullOrEmpty(employeeId))
         {
-            _logger.LogWarning("User email not found in claims");
+            _logger.LogWarning("Employee identifier not found in claims");
             return Unauthorized();
         }
 
-        _logger.LogInformation("Fetching payslips for user: {UserEmail}", userEmail);
+        _logger.LogInformation("Fetching payslips for employee {EmployeeId}", employeeId);
 
-        var payslips = await _payslipService.GetPayslipsForEmployeeAsync(userEmail, cancellationToken);
-        
-        ViewData["UserEmail"] = userEmail;
+        var payslips = await _queryService.GetPayslipsForEmployeeAsync(employeeId, cancellationToken);
+
+        ViewData["UserEmail"] = User.FindFirstValue("preferred_username") ?? User.FindFirstValue(ClaimTypes.Email);
         ViewData["UserName"] = User.Identity?.Name ?? "User";
-        
+
         return View(payslips);
     }
 
@@ -51,27 +56,27 @@ public class PayslipsController : Controller
     {
         if (string.IsNullOrWhiteSpace(id))
         {
-            return BadRequest("Payslip ID is required.");
+            return BadRequest("Payslip blob name is required.");
         }
 
-        var userEmail = GetUserEmail();
-        if (string.IsNullOrEmpty(userEmail))
+        var employeeId = GetEmployeeId();
+        if (string.IsNullOrEmpty(employeeId))
         {
-            _logger.LogWarning("User email not found in claims");
+            _logger.LogWarning("Employee identifier not found in claims");
             return Unauthorized();
         }
 
-        _logger.LogInformation("User {UserEmail} downloading payslip: {PayslipId}", userEmail, id);
+        _logger.LogInformation("Employee {EmployeeId} downloading payslip {BlobName}", employeeId, id);
 
-        var stream = await _payslipService.DownloadPayslipAsync(id, userEmail, cancellationToken);
+        var stream = await _downloadService.DownloadAsync(employeeId, id, cancellationToken);
 
         if (stream == null)
         {
-            _logger.LogWarning("Payslip {PayslipId} not found or unauthorized access by {UserEmail}", id, userEmail);
+            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
             return NotFound();
         }
 
-        return File(stream, "application/pdf", $"payslip_{id}.pdf");
+        return File(stream, "application/pdf", $"payslip_{id}");
     }
 
     /// <summary>
@@ -82,23 +87,23 @@ public class PayslipsController : Controller
     {
         if (string.IsNullOrWhiteSpace(id))
         {
-            return BadRequest("Payslip ID is required.");
+            return BadRequest("Payslip blob name is required.");
         }
 
-        var userEmail = GetUserEmail();
-        if (string.IsNullOrEmpty(userEmail))
+        var employeeId = GetEmployeeId();
+        if (string.IsNullOrEmpty(employeeId))
         {
-            _logger.LogWarning("User email not found in claims");
+            _logger.LogWarning("Employee identifier not found in claims");
             return Unauthorized();
         }
 
-        _logger.LogInformation("User {UserEmail} viewing details for payslip: {PayslipId}", userEmail, id);
+        _logger.LogInformation("Employee {EmployeeId} viewing details for payslip {BlobName}", employeeId, id);
 
-        var payslip = await _payslipService.GetPayslipByIdAsync(id, userEmail, cancellationToken);
+        var payslip = await _queryService.GetPayslipDetailsAsync(employeeId, id, cancellationToken);
 
         if (payslip == null)
         {
-            _logger.LogWarning("Payslip {PayslipId} not found or unauthorized access by {UserEmail}", id, userEmail);
+            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
             return NotFound();
         }
 
@@ -113,36 +118,33 @@ public class PayslipsController : Controller
     {
         if (string.IsNullOrWhiteSpace(id))
         {
-            return BadRequest("Payslip ID is required.");
+            return BadRequest("Payslip blob name is required.");
         }
 
-        var userEmail = GetUserEmail();
-        if (string.IsNullOrEmpty(userEmail))
+        var employeeId = GetEmployeeId();
+        if (string.IsNullOrEmpty(employeeId))
         {
-            _logger.LogWarning("User email not found in claims");
+            _logger.LogWarning("Employee identifier not found in claims");
             return Unauthorized();
         }
 
-        _logger.LogInformation("User {UserEmail} requesting download URL for payslip: {PayslipId}", userEmail, id);
+        _logger.LogInformation("Employee {EmployeeId} requesting download URL for payslip {BlobName}", employeeId, id);
 
-        var downloadUrl = await _payslipService.GetPayslipDownloadUrlAsync(id, userEmail, TimeSpan.FromMinutes(15), cancellationToken);
+        var downloadUrl = await _downloadService.GenerateDownloadUrlAsync(employeeId, id, TimeSpan.FromMinutes(15), cancellationToken);
 
         if (downloadUrl == null)
         {
-            _logger.LogWarning("Payslip {PayslipId} not found or unauthorized access by {UserEmail}", id, userEmail);
+            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
             return NotFound();
         }
 
         return Json(new { downloadUrl });
     }
 
-    private string? GetUserEmail()
+    private string? GetEmployeeId()
     {
-        // Try to get email from preferred_username claim (Microsoft Entra ID)
-        var email = User.FindFirstValue("preferred_username") 
-                    ?? User.FindFirstValue(ClaimTypes.Email)
-                    ?? User.FindFirstValue("email");
-
-        return email;
+        // Use the Entra Object ID (oid claim) as the employee identifier
+        return User.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier")
+               ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
     }
 }

@@ -6,8 +6,8 @@ using PayslipsManager.Infrastructure;
 var builder = WebApplication.CreateBuilder(args);
 
 // Load local configuration file if it exists (for secrets)
-builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
 
 // Check if we should bypass authentication (for local development)
