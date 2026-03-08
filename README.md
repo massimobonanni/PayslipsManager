@@ -1,183 +1,365 @@
 # PayslipsManager
 
-A .NET 10 application demonstrating **Azure Blob Storage** integration for secure employee payslip management with **Microsoft Entra ID** authentication.
+A **.NET 10** demo application showing how to use **Azure Blob Storage** in a realistic business scenario. Employees sign in with their corporate **Microsoft Entra ID** account, view their monthly payslips, and download PDF files — while the system enforces per-employee data isolation and demonstrates Hot, Cool, Cold, and Archive access tiers.
 
-## 🎯 Project Overview
+---
 
-PayslipsManager showcases how to build a secure document management system using:
-- **Azure Blob Storage** for storing PDF payslips
-- **Microsoft Entra ID** for corporate authentication
-- **Clean Architecture** principles
-- **Azure Functions** for event-driven processing
-- **Blob access tiers** (Hot/Cool/Archive) for cost optimization
-- **SAS tokens** for secure, time-limited access
+## Solution Structure
 
-## 🏗️ Solution Structure
-
-```
+```text
 PayslipsManager/
+├─ .github/
+│  └─ copilot-instructions.md        # Copilot coding rules
+├─ docs/
+│  └─ CONFIGURATION.md               # Detailed auth setup guide
 ├─ src/
-│  ├─ PayslipsManager.Domain/          # Domain models, enums, value objects
-│  ├─ PayslipsManager.Application/     # DTOs, interfaces, application services
-│  ├─ PayslipsManager.Infrastructure/  # Azure Blob Storage repository, DI setup
-│  ├─ PayslipsManager.Web/             # ASP.NET Core MVC web application
-│  └─ PayslipsManager.Functions/       # Azure Functions for blob event handling
-├─ azure.yaml                           # Azure Developer CLI configuration
-├─ infra/                               # Bicep infrastructure as code
+│  ├─ PayslipsManager.Domain/        # Entities, enums, value objects
+│  ├─ PayslipsManager.Application/   # DTOs, interfaces, application services
+│  ├─ PayslipsManager.Infrastructure/# Azure Blob Storage repository, DI
+│  ├─ PayslipsManager.Web/           # ASP.NET Core MVC front-end
+│  └─ PayslipsManager.Functions/     # Azure Function – Event Grid trigger
+├─ infra/                             # Bicep infrastructure-as-code
+├─ azure.yaml                         # Azure Developer CLI manifest
 └─ README.md
 ```
 
-### Projects
+| Project | Target | Responsibility |
+|---------|--------|----------------|
+| **Domain** | net10.0 (class library) | `Employee`, `PayslipDocument`, enums (`BlobAccessTier`, `EmploymentStatus`, `PayslipStatus`), validation result |
+| **Application** | net10.0 (class library) | Service interfaces (`IPayslipQueryService`, `IPayslipDownloadService`, `IPayslipEventProcessor`, `IPayslipStorageService`, `IEmployeeContextService`), DTOs, `PayslipService` |
+| **Infrastructure** | net10.0 (class library) | `BlobPayslipRepository` (Azure Blob SDK), `PayslipEventProcessor`, `BlobStorageOptions`, `DependencyInjection` |
+| **Web** | net10.0 (ASP.NET Core MVC) | Controllers, Razor views, `EmployeeContextService`, Entra ID / cookie auth |
+| **Functions** | net10.0 (isolated worker) | `PayslipBlobCreatedFunction` — Event Grid trigger that validates new blobs and applies index tags |
 
-| Project | Framework | Purpose |
-|---------|-----------|---------|
-| **Domain** | net10.0 | Core business entities and enums |
-| **Application** | net10.0 | Business logic, DTOs, service interfaces |
-| **Infrastructure** | net10.0 | Azure Blob Storage implementation |
-| **Web** | net10.0 | ASP.NET Core MVC UI with Entra ID auth |
-| **Functions** | net10.0 | Blob trigger for automated metadata tagging |
+---
 
-## 🔑 Key Features
+## Prerequisites
 
-### 1. Secure Authentication
-- Microsoft Entra ID (Azure AD) integration
-- Employee can only see their own payslips
-- Role-based access control ready
+| Tool | Version | Notes |
+|------|---------|-------|
+| .NET SDK | **10.0** | `dotnet --version` |
+| Azure CLI | latest | `az --version` |
+| Azure Developer CLI | latest | `azd version` (optional, for `azd up`) |
+| Azurite **or** Azure Storage Account | — | Local emulator or cloud storage |
+| Azure Functions Core Tools | **v4** | Only needed to run the Functions project locally |
 
-### 2. Azure Blob Storage Integration
-- Store payslips as PDF files
-- Automatic metadata tagging
-- Blob indexing with tags for efficient queries
-- Support for Hot, Cool, and Archive access tiers
+---
 
-### 3. Azure Functions Event Processing
-- Blob trigger on new payslip uploads
-- Automatic tagging with employee information
-- Metadata enrichment for searchability
+## Local Development
 
-### 4. Clean Architecture
-- Domain-driven design
-- Separation of concerns
-- Dependency inversion principle
-- Repository pattern
+### 1. Clone and build
 
-## 🚀 Getting Started
+```powershell
+git clone https://github.com/massimobonanni/PayslipsManager.git
+cd PayslipsManager
+dotnet build
+```
 
-### Prerequisites
+### 2. Configuration files
 
-- **.NET 10 SDK** (preview)
-- **Azure subscription**
-- **Visual Studio 2022** or **VS Code** with C# extension
-- **Azure CLI** and **Azure Developer CLI (azd)**
+The Web project loads settings in this order (last wins):
 
-### Local Development Setup
+1. `appsettings.json` — shared defaults (checked in)
+2. `appsettings.Development.json` — development overrides (checked in, sets `BypassAuthentication: true`)
+3. `appsettings.local.json` — **your secrets** (git-ignored via `*.local.json`)
 
-1. **Clone the repository**
-   ```powershell
-   git clone https://github.com/massimobonanni/PayslipsManager.git
-   cd PayslipsManager
-   ```
+#### Web — `appsettings.json`
 
-2. **Configure Azure AD Application**
-   - Go to Azure Portal → Microsoft Entra ID → App registrations
-   - Create a new app registration with **single-tenant** configuration
-   - Set **Supported account types** to "Accounts in this organizational directory only"
-   - Note down: 
-     - `TenantId` (found in Overview)
-     - `Domain` (e.g., `contoso.onmicrosoft.com`)
-     - `ClientId` (Application ID in Overview)
-   - Create a client secret under "Certificates & secrets"
-   - Configure redirect URIs under "Authentication": `https://localhost:7xxx/signin-oidc`
+Contains empty placeholders for Entra ID and storage. In production, values come from App Service configuration or Key Vault references.
 
-3. **Update appsettings.local.json** (Web project)
-   
-   Create or update `src/PayslipsManager.Web/appsettings.local.json` with your values:
-   
-   ```json
-   {
-     "AzureAd": {
-       "Instance": "https://login.microsoftonline.com/",
-       "Domain": "contoso.onmicrosoft.com",
-       "TenantId": "12345678-1234-1234-1234-123456789abc",
-       "ClientId": "87654321-4321-4321-4321-cba987654321",
-       "ClientSecret": "your-client-secret-here"
-     },
-     "BlobStorage": {
-       "AccountUrl": "https://yourstorageaccount.blob.core.windows.net",
-       "ContainerName": "payslips",
-       "UseManagedIdentity": false,
-       "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=..."
-     },
-     "BypassAuthentication": false
-   }
-   ```
-   
-   **Note:** This file is excluded from source control (.gitignore) to protect your secrets.
+```jsonc
+{
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "Domain": "",
+    "TenantId": "",
+    "ClientId": "",
+    "CallbackPath": "/signin-oidc",
+    "SignedOutCallbackPath": "/signout-callback-oidc"
+  },
+  "BlobStorage": {
+    "AccountUrl": "",
+    "ContainerPrefix": "payslips",
+    "UseManagedIdentity": true
+  }
+}
+```
 
-4. **Create Storage Account and Container**
-   ```powershell
-   az storage account create --name <account-name> --resource-group <rg-name>
-   az storage container create --name payslips --account-name <account-name>
-   ```
+#### Web — `appsettings.Development.json`
 
-5. **Build and Run**
-   ```powershell
-   dotnet build
-   dotnet run --project src/PayslipsManager.Web
-   ```
+Ships with `BypassAuthentication: true` so you can run locally without an Entra app registration. Uses the Azurite connection string by default.
 
-## 📦 Deployment to Azure
+```jsonc
+{
+  "BlobStorage": {
+    "UseManagedIdentity": false,
+    "ConnectionString": "UseDevelopmentStorage=true"
+  },
+  "BypassAuthentication": true
+}
+```
 
-### Using Azure Developer CLI (azd)
+#### Web — `appsettings.local.json` (create manually, git-ignored)
 
-1. **Initialize azd**
-   ```powershell
-   azd init
-   ```
+To test with real Entra ID sign-in or a real Storage Account, create this file:
 
-2. **Deploy to Azure**
-   ```powershell
-   azd up
-   ```
+```jsonc
+{
+  "AzureAd": {
+    "Domain": "contoso.onmicrosoft.com",
+    "TenantId": "<YOUR_TENANT_ID>",
+    "ClientId": "<YOUR_CLIENT_ID>",
+    "ClientSecret": "<YOUR_CLIENT_SECRET>"
+  },
+  "BlobStorage": {
+    "AccountUrl": "https://<YOUR_STORAGE_ACCOUNT>.blob.core.windows.net",
+    "UseManagedIdentity": false,
+    "ConnectionString": "<YOUR_STORAGE_CONNECTION_STRING>"
+  },
+  "BypassAuthentication": false
+}
+```
 
-This will:
-- Provision Azure resources (Storage Account, App Service, Function App)
-- Configure managed identity
-- Deploy the application
-- Set up RBAC permissions
+#### Functions — `local.settings.json`
 
-## 🔐 Security Features
+```jsonc
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "BlobStorage:ConnectionString": "UseDevelopmentStorage=true",
+    "BlobStorage:AccountUrl": "",
+    "BlobStorage:ContainerPrefix": "payslips",
+    "BlobStorage:UseManagedIdentity": "false"
+  }
+}
+```
 
-- **Authentication**: Microsoft Entra ID (Single-Tenant)
-  - Only users from your organization can sign in
-  - Configure `TenantId` with your specific tenant ID (not "common")
-  - Set `Domain` to your tenant domain
-- **Authorization**: User can only access their own payslips
-- **Data isolation**: Employee email validation on every request
-- **Secure downloads**: Time-limited SAS tokens
-- **Managed Identity**: No credentials stored in code
+### 3. `DefaultAzureCredential` support
 
-### Single-Tenant vs Multi-Tenant
+When `UseManagedIdentity` is `true`, the infrastructure layer creates the `BlobServiceClient` with `DefaultAzureCredential`. This works seamlessly in:
 
-This application is configured for **single-tenant** use:
-- ✅ **Single-Tenant** (Default): Only users from YOUR organization
-  - `TenantId`: Your specific tenant GUID
-  - `Domain`: Your tenant domain (e.g., `contoso.onmicrosoft.com`)
-- ❌ **Multi-Tenant**: Users from ANY organization
-  - `TenantId`: "common" or "organizations" (NOT recommended for this app)
+- **Local dev** — picks up your `az login` session or Visual Studio credentials.
+- **Azure** — uses the system-assigned or user-assigned managed identity of the App Service / Function App.
 
-**Why Single-Tenant?**
-Payslip data is highly sensitive and should only be accessible to employees within your organization.
+When `UseManagedIdentity` is `false`, the `ConnectionString` value is used instead (suitable for Azurite or account-key access).
 
-## 📊 Azure Blob Storage Concepts Demonstrated
+### 4. Options class — `BlobStorageOptions`
 
-1. **Blob Containers** - Organizing payslips
-2. **Blob Metadata** - Custom properties for each document
-3. **Blob Tags** - Index tags for efficient querying
-4. **Access Tiers** - Hot, Cool, Archive for cost optimization
-5. **SAS Tokens** - Secure, time-limited download URLs
-6. **Blob Triggers** - Event-driven processing with Azure Functions
-7. **Managed Identity** - Secure authentication without keys
+Located in `PayslipsManager.Infrastructure/Configuration/BlobStorageOptions.cs`. Bound to the `BlobStorage` configuration section.
+
+| Property | Type | Default | Purpose |
+|---|---|---|---|
+| `AccountUrl` | `string` | `""` | Storage account blob endpoint URL |
+| `ContainerPrefix` | `string` | `"payslips"` | Prefix for per-employee containers (`payslips-{employeeId}`) |
+| `UseManagedIdentity` | `bool` | `true` | Use `DefaultAzureCredential` when true |
+| `ConnectionString` | `string?` | `null` | Connection string for local / key-based access |
+
+### 5. Run the Web app
+
+```powershell
+dotnet run --project src/PayslipsManager.Web
+```
+
+With `BypassAuthentication: true`, navigate to the dev-login page to sign in as a sample user:
+
+```
+https://localhost:<port>/Home/DevLogin?email=alice.rossi@contoso.com
+```
+
+### 6. Run the Azure Function locally
+
+```powershell
+cd src/PayslipsManager.Functions
+func start
+```
+
+The function listens for **Event Grid** events (`Microsoft.Storage.BlobCreated`). To test locally, send a test event with the Azure CLI or Event Grid simulator.
+
+---
+
+## Azure Resources Needed
+
+| Resource | SKU / Tier | Purpose |
+|----------|-----------|---------|
+| **Storage Account** | Standard LRS (GPv2) | Blob containers per employee, lifecycle management |
+| **App Service** | B1 or higher | Hosts the MVC web app |
+| **Function App** | Consumption or Flex Consumption | Runs the Event Grid trigger |
+| **App Service Plan** | Shared between Web + Functions (optional) | Cost optimization for demo |
+| **Microsoft Entra ID** | Any tenant | App registration for single-tenant auth |
+| **Event Grid System Topic** | On the Storage Account | Routes `BlobCreated` events to the Function |
+| **Application Insights** | (optional) | Telemetry for the Function app |
+
+### Required RBAC role assignments
+
+| Identity | Role | Scope |
+|----------|------|-------|
+| App Service managed identity | **Storage Blob Data Contributor** | Storage Account |
+| Function App managed identity | **Storage Blob Data Contributor** | Storage Account |
+| Developer (local dev with `az login`) | **Storage Blob Data Contributor** | Storage Account |
+
+---
+
+## Authentication Setup
+
+1. Go to **Azure Portal** → **Microsoft Entra ID** → **App registrations** → **New registration**.
+2. Set **Supported account types** to *Accounts in this organizational directory only* (single tenant).
+3. Set **Redirect URI** to `https://localhost:<port>/signin-oidc` (Web platform).
+4. Under **Certificates & secrets**, create a client secret.
+5. Copy `TenantId`, `ClientId`, `Domain`, and the secret into `appsettings.local.json`.
+
+For detailed steps and troubleshooting, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+
+---
+
+## Storage Setup
+
+Each employee gets a dedicated blob container named `{ContainerPrefix}-{employeeId}` (e.g., `payslips-abc123`).
+
+Payslip PDFs follow the naming convention **`yyyy-MM.pdf`** (e.g., `2026-03.pdf`).
+
+Blob index tags applied by the Function:
+
+| Tag | Example |
+|-----|---------|
+| `EmployeeId` | `abc123` |
+| `PayslipYear` | `2026` |
+| `PayslipMonth` | `03` |
+| `DocumentType` | `Payslip` |
+
+---
+
+## Event Flow
+
+```text
+┌──────────────┐         ┌───────────────────┐         ┌──────────────────────┐
+│  HR uploads  │  blob   │  Azure Storage    │  event  │  Event Grid System   │
+│  a PDF to    │ ──────> │  (container       │ ──────> │  Topic               │
+│  the employee│         │   payslips-<id>)  │         │  BlobCreated         │
+│  container   │         └───────────────────┘         └──────────┬───────────┘
+└──────────────┘                                                  │
+                                                                  │ subscription
+                                                                  ▼
+                                                       ┌──────────────────────┐
+                                                       │  PayslipBlobCreated  │
+                                                       │  Function            │
+                                                       │  (Event Grid Trigger)│
+                                                       └──────────┬───────────┘
+                                                                  │
+                                          ┌───────────────────────┤
+                                          │                       │
+                                          ▼                       ▼
+                                   Validate blob name      Apply blob index tags
+                                   (yyyy-MM.pdf)           (EmployeeId, Year,
+                                                            Month, DocumentType)
+```
+
+1. An HR operator (or automation) uploads a PDF named `yyyy-MM.pdf` into the employee's container.
+2. Azure Storage raises a `Microsoft.Storage.BlobCreated` event.
+3. The Event Grid System Topic routes the event to the `PayslipBlobCreatedFunction`.
+4. The function validates the blob name, checks idempotency, and applies blob index tags.
+5. When the employee signs into the Web app, `PayslipService` lists blobs in their container, reads tags, and shows the payslip list sorted by date.
+6. The employee can view details or download the PDF. Archive-tier payslips show a warning that rehydration is needed.
+
+---
+
+## Demo Sample Data
+
+The table below describes the sample employees and payslips you should create to demonstrate all features (access tiers, former employees, archive warnings).
+
+### Sample Employees
+
+| # | Display Name | Employee ID | Container | Status | Notes |
+|---|-------------|-------------|-----------|--------|-------|
+| 1 | Alice Rossi | `alice-rossi` | `payslips-alice-rossi` | **Active** | Primary demo user |
+| 2 | Bob Fischer | `bob-fischer` | `payslips-bob-fischer` | **Active** | Second active employee |
+| 3 | Carol Chen | `carol-chen` | `payslips-carol-chen` | **Active** | Shows Cool-tier payslips |
+| 4 | Dave Müller | `dave-mueller` | `payslips-dave-mueller` | **Former** | Left the company — demonstrates archived/former scenario |
+
+### Sample Payslips
+
+Upload these files (any small PDF will do) into each employee's container, then let the Function apply tags, or set tags manually.
+
+#### Alice Rossi (`payslips-alice-rossi`) — Active
+
+| Blob Name | Access Tier | Tags (Year/Month) | Purpose |
+|-----------|-------------|-------------------|---------|
+| `2026-01.pdf` | **Hot** | 2026 / 01 | Recent payslip, immediately downloadable |
+| `2026-02.pdf` | **Hot** | 2026 / 02 | Recent payslip |
+| `2025-12.pdf` | **Cool** | 2025 / 12 | Older payslip moved to Cool tier |
+| `2025-06.pdf` | **Cold** | 2025 / 06 | Even older payslip in Cold tier |
+| `2024-12.pdf` | **Archive** | 2024 / 12 | Archived payslip — triggers rehydration warning in UI |
+
+#### Bob Fischer (`payslips-bob-fischer`) — Active
+
+| Blob Name | Access Tier | Tags (Year/Month) | Purpose |
+|-----------|-------------|-------------------|---------|
+| `2026-01.pdf` | **Hot** | 2026 / 01 | Recent payslip |
+| `2026-02.pdf` | **Hot** | 2026 / 02 | Recent payslip |
+| `2025-09.pdf` | **Cool** | 2025 / 09 | Demonstrates Cool tier |
+
+#### Carol Chen (`payslips-carol-chen`) — Active
+
+| Blob Name | Access Tier | Tags (Year/Month) | Purpose |
+|-----------|-------------|-------------------|---------|
+| `2026-01.pdf` | **Hot** | 2026 / 01 | Recent payslip |
+| `2025-11.pdf` | **Cool** | 2025 / 11 | Cool tier |
+| `2025-03.pdf` | **Cold** | 2025 / 03 | Cold tier |
+| `2024-06.pdf` | **Archive** | 2024 / 06 | Archive tier — rehydration warning |
+
+#### Dave Müller (`payslips-dave-mueller`) — Former Employee
+
+| Blob Name | Access Tier | Tags (Year/Month) | Purpose |
+|-----------|-------------|-------------------|---------|
+| `2025-06.pdf` | **Archive** | 2025 / 06 | Last payslip before departure, archived |
+| `2025-05.pdf` | **Archive** | 2025 / 05 | Archived |
+| `2024-12.pdf` | **Archive** | 2024 / 12 | Archived — all payslips for former employees are in Archive |
+
+### Creating demo data with Azure CLI
+
+```powershell
+# Variables
+$storageAccount = "<YOUR_STORAGE_ACCOUNT>"
+$rg = "<YOUR_RESOURCE_GROUP>"
+
+# Create containers
+az storage container create -n payslips-alice-rossi   --account-name $storageAccount
+az storage container create -n payslips-bob-fischer    --account-name $storageAccount
+az storage container create -n payslips-carol-chen     --account-name $storageAccount
+az storage container create -n payslips-dave-mueller   --account-name $storageAccount
+
+# Upload sample PDFs (use any small PDF file)
+# Example for Alice Rossi:
+az storage blob upload --account-name $storageAccount -c payslips-alice-rossi -n "2026-01.pdf" -f sample.pdf --tier Hot
+az storage blob upload --account-name $storageAccount -c payslips-alice-rossi -n "2026-02.pdf" -f sample.pdf --tier Hot
+az storage blob upload --account-name $storageAccount -c payslips-alice-rossi -n "2025-12.pdf" -f sample.pdf --tier Cool
+az storage blob upload --account-name $storageAccount -c payslips-alice-rossi -n "2025-06.pdf" -f sample.pdf --tier Cold
+az storage blob upload --account-name $storageAccount -c payslips-alice-rossi -n "2024-12.pdf" -f sample.pdf --tier Archive
+
+# Set blob tags (the Function does this automatically via Event Grid,
+# but you can also set them manually):
+az storage blob tag set --account-name $storageAccount -c payslips-alice-rossi -n "2026-01.pdf" `
+  --tags "EmployeeId=alice-rossi" "PayslipYear=2026" "PayslipMonth=01" "DocumentType=Payslip"
+```
+
+> **Tip:** If the Event Grid subscription is configured, uploading a blob triggers the Function automatically, and tags are applied without manual intervention.
+
+---
+
+## Azure Blob Storage Concepts Demonstrated
+
+| Concept | Where |
+|---------|-------|
+| **Per-entity containers** | Each employee gets `payslips-{id}` |
+| **Blob naming convention** | `yyyy-MM.pdf` enforced by validation |
+| **Blob index tags** | Applied by the Function, queried by the app |
+| **Access tiers (Hot / Cool / Cold / Archive)** | Demo data uses all four tiers |
+| **Archive rehydration warning** | UI warns when payslip is in Archive tier |
+| **SAS tokens** | Time-limited download URLs generated server-side |
+| **Event Grid integration** | `BlobCreated` → Function → tag enrichment |
+| **DefaultAzureCredential** | Managed identity in Azure, `az login` locally |
+| **Lifecycle management** | Move older payslips to Cool → Cold → Archive |
 
 ## 📁 Sample Blob Naming Convention
 

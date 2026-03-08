@@ -333,6 +333,7 @@ public partial class BlobPayslipRepository : IPayslipStorageService
         tier switch
         {
             "Cool" => BlobAccessTier.Cool,
+            "Cold" => BlobAccessTier.Cold,
             "Archive" => BlobAccessTier.Archive,
             _ => BlobAccessTier.Hot
         };

@@ -16,6 +16,11 @@ public enum BlobAccessTier
     Cool,
 
     /// <summary>
+    /// Cold tier - optimized for rarely accessed data (90+ days).
+    /// </summary>
+    Cold,
+
+    /// <summary>
     /// Archive tier - optimized for rare access (180+ days).
     /// </summary>
     Archive
