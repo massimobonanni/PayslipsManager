@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: payslips-manager
+metadata:
+  template: PayslipsManager
+
+services:
+  web:
+    project: ./src/PayslipsManager.Web
+    host: appservice
+    language: dotnet
+    
+  functions:
+    project: ./src/PayslipsManager.Functions
+    host: function
+    language: dotnet
