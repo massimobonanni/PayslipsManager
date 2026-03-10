@@ -27,7 +27,9 @@ public class HomeController : Controller
     }
 
     /// <summary>
-    /// Development-only login endpoint for testing without Azure AD
+    /// Development-only login endpoint for testing without Entra ID.
+    /// Requires BypassAuthentication=true in configuration.
+    /// Example: /Home/DevLogin?email=alice.rossi@contoso.com
     /// </summary>
     public async Task<IActionResult> DevLogin(string email = "john.doe@company.com")
     {

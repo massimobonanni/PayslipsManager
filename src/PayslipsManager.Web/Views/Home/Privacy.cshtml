@@ -1,6 +1,9 @@
 ﻿@{
     ViewData["Title"] = "Privacy Policy";
 }
-<h1>@ViewData["Title"]</h1>
 
-<p>Use this page to detail your site's privacy policy.</p>
+<div class="container mt-4">
+    <h1><i class="bi bi-shield-lock"></i> @ViewData["Title"]</h1>
+    <p class="lead">PayslipsManager stores your payslip documents securely in Azure Blob Storage and uses Microsoft Entra&nbsp;ID to ensure only you can access your own files.</p>
+    <p>No payslip data is shared with third parties. Access is restricted on a per-employee basis using dedicated storage containers and managed-identity authentication.</p>
+</div>

@@ -26,6 +26,8 @@ public class EmployeeContextService : IEmployeeContextService
         if (user?.Identity?.IsAuthenticated != true)
             return null;
 
+        // Use the Entra Object ID (oid) as the employee identifier.
+        // In a production system you would map this to your HR system's employee ID.
         var objectId = user.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier")
                        ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
 

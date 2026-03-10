@@ -100,7 +100,7 @@ public partial class BlobPayslipRepository : IPayslipStorageService
         string employeeId, CancellationToken cancellationToken = default)
     {
         var containerName = ResolveContainerName(employeeId);
-        _logger.LogInformation("Listing payslips in container {ContainerName}", containerName);
+        _logger.LogDebug("Listing payslips in container {ContainerName}", containerName);
 
         var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
         var documents = new List<PayslipDocument>();
@@ -123,7 +123,7 @@ public partial class BlobPayslipRepository : IPayslipStorageService
             return documents.AsReadOnly();
         }
 
-        _logger.LogInformation("Found {Count} payslips in container {ContainerName}",
+        _logger.LogDebug("Found {Count} payslips in container {ContainerName}",
             documents.Count, containerName);
         return documents.AsReadOnly();
     }
@@ -135,7 +135,7 @@ public partial class BlobPayslipRepository : IPayslipStorageService
         string employeeId, string blobName, CancellationToken cancellationToken = default)
     {
         var containerName = ResolveContainerName(employeeId);
-        _logger.LogInformation("Getting payslip {BlobName} from container {ContainerName}",
+        _logger.LogDebug("Getting payslip {BlobName} from container {ContainerName}",
             blobName, containerName);
 
         var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
@@ -237,7 +237,7 @@ public partial class BlobPayslipRepository : IPayslipStorageService
         CancellationToken cancellationToken = default)
     {
         var containerName = ResolveContainerName(employeeId);
-        _logger.LogInformation("Generating SAS URL for {BlobName} in container {ContainerName}",
+        _logger.LogDebug("Generating SAS URL for {BlobName} in container {ContainerName}",
             blobName, containerName);
 
         var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);

@@ -70,7 +70,7 @@ The repository includes an `appsettings.local.json` file that is **excluded from
   },
   "BlobStorage": {
     "AccountUrl": "https://yourstorageaccount.blob.core.windows.net",
-    "ContainerName": "payslips",
+    "ContainerPrefix": "payslips",
     "UseManagedIdentity": false,
     "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=yourstorageaccount;AccountKey=..."
   },

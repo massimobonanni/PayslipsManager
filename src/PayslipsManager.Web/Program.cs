@@ -7,8 +7,7 @@ using PayslipsManager.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load local configuration file if it exists (for secrets)
-builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+// Load local configuration file if it exists (git-ignored, for secrets)
 builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, reloadOnChange: true);
 
 

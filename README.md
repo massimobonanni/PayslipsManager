@@ -361,55 +361,37 @@ az storage blob tag set --account-name $storageAccount -c payslips-alice-rossi -
 | **DefaultAzureCredential** | Managed identity in Azure, `az login` locally |
 | **Lifecycle management** | Move older payslips to Cool → Cold → Archive |
 
-## 📁 Sample Blob Naming Convention
+## Technology Stack
 
-Payslip blobs follow the pattern:
-```
-{employeeId}_{year}_{month}.pdf
-Example: EMP001_2026_03.pdf
-```
+| Technology | Purpose |
+|-----------|---------|
+| .NET 10 | Runtime & SDK |
+| ASP.NET Core MVC | Employee-facing web app |
+| Azure Blob Storage SDK | Payslip PDF storage |
+| Microsoft Identity Web | Entra ID authentication |
+| Azure Functions (Isolated Worker) | Event-driven blob processing |
+| Azure Event Grid | BlobCreated event routing |
+| Bicep | Infrastructure as Code |
+| Azure Developer CLI (`azd`) | Deployment orchestration |
 
-## 🏷️ Blob Tags Structure
-
-Each payslip blob is tagged with:
-- `EmployeeId` - Employee identifier
-- `EmployeeEmail` - Corporate email
-- `EmployeeName` - Display name
-- `Year` - Payslip year
-- `Month` - Payslip month (1-12)
-- `ProcessedAt` - Processing timestamp
-
-## 🛠️ Technology Stack
-
-- **Framework**: .NET 10
-- **Web**: ASP.NET Core MVC
-- **Storage**: Azure Blob Storage SDK
-- **Authentication**: Microsoft Identity Web
-- **Functions**: Azure Functions (Isolated Worker)
-- **Logging**: Microsoft.Extensions.Logging
-- **DI**: Microsoft.Extensions.DependencyInjection
-
-## 📚 Learning Resources
+## Learning Resources
 
 - [Azure Blob Storage Documentation](https://learn.microsoft.com/azure/storage/blobs/)
 - [Microsoft Identity Platform](https://learn.microsoft.com/entra/identity-platform/)
 - [Azure Functions](https://learn.microsoft.com/azure/azure-functions/)
+- [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/)
 - [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 
-## 🤝 Contributing
+## Contributing
 
 This is a demo application for training and conference presentations. Feel free to fork and customize for your own use cases.
 
-## 📄 License
+## License
 
-MIT License - See LICENSE file for details
+MIT License — see [LICENSE](LICENSE) file for details.
 
-## 👤 Author
+## Author
 
 **Massimo Bonanni**
 - Blog: [Configure and Code](https://configureandcode.cloud)
 - GitHub: [@massimobonanni](https://github.com/massimobonanni)
-
----
-
-**Note**: This application uses .NET 10 (preview). For production, use the latest stable .NET version.

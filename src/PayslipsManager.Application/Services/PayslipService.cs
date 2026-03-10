@@ -24,7 +24,7 @@ public class PayslipService : IPayslipQueryService, IPayslipDownloadService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
 
-        _logger.LogInformation("Retrieving payslips for employee {EmployeeId}", employeeId);
+        _logger.LogDebug("Retrieving payslips for employee {EmployeeId}", employeeId);
 
         var documents = await _storage.ListPayslipsAsync(employeeId, cancellationToken);
 
@@ -40,7 +40,7 @@ public class PayslipService : IPayslipQueryService, IPayslipDownloadService
         ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
 
-        _logger.LogInformation("Retrieving payslip {BlobName} for employee {EmployeeId}", blobName, employeeId);
+        _logger.LogDebug("Retrieving payslip details {BlobName} for employee {EmployeeId}", blobName, employeeId);
 
         var doc = await _storage.GetPayslipAsync(employeeId, blobName, cancellationToken);
         if (doc is null)
@@ -57,7 +57,7 @@ public class PayslipService : IPayslipQueryService, IPayslipDownloadService
         ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
 
-        _logger.LogInformation("Downloading payslip {BlobName} for employee {EmployeeId}", blobName, employeeId);
+        _logger.LogInformation("Payslip download initiated -- Employee: {EmployeeId}, Blob: {BlobName}", employeeId, blobName);
 
         return await _storage.DownloadContentAsync(employeeId, blobName, cancellationToken);
     }
@@ -67,7 +67,7 @@ public class PayslipService : IPayslipQueryService, IPayslipDownloadService
         ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
 
-        _logger.LogInformation("Generating download URL for payslip {BlobName} for employee {EmployeeId}", blobName, employeeId);
+        _logger.LogDebug("Generating SAS download URL -- Employee: {EmployeeId}, Blob: {BlobName}", employeeId, blobName);
 
         return await _storage.GenerateSasUrlAsync(employeeId, blobName, validity, cancellationToken);
     }
