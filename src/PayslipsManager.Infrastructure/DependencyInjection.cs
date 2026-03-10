@@ -3,6 +3,7 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Identity.Web;
 using PayslipsManager.Application.Interfaces;
 using PayslipsManager.Application.Services;
 using PayslipsManager.Infrastructure.Configuration;
@@ -24,27 +25,46 @@ public static class DependencyInjection
         // Configure options
         services.Configure<BlobStorageOptions>(configuration.GetSection(BlobStorageOptions.SectionName));
 
-        // Register BlobServiceClient as a singleton (reuse across requests)
-        services.AddSingleton(sp =>
+        var blobOptions = configuration.GetSection(BlobStorageOptions.SectionName).Get<BlobStorageOptions>()
+            ?? new BlobStorageOptions();
+
+        if (blobOptions.UseUserDelegatedAccess)
         {
-            var options = sp.GetRequiredService<IOptions<BlobStorageOptions>>().Value;
-
-            if (options.UseManagedIdentity && !string.IsNullOrEmpty(options.AccountUrl))
+            // Scoped: each request gets a BlobServiceClient authenticated as the signed-in user.
+            // Azure RBAC on individual containers controls what each user can access.
+            services.AddScoped(sp =>
             {
-                return new BlobServiceClient(new Uri(options.AccountUrl), new DefaultAzureCredential());
-            }
+                var options = sp.GetRequiredService<IOptions<BlobStorageOptions>>().Value;
+                var tokenAcquisition = sp.GetRequiredService<ITokenAcquisition>();
+                var credential = new UserDelegatedTokenCredential(tokenAcquisition);
+                return new BlobServiceClient(new Uri(options.AccountUrl), credential);
+            });
 
-            if (!string.IsNullOrEmpty(options.ConnectionString))
+            services.AddScoped<IPayslipStorageService, BlobPayslipRepository>();
+        }
+        else
+        {
+            // Singleton: shared client using managed identity or connection string.
+            services.AddSingleton(sp =>
             {
-                return new BlobServiceClient(options.ConnectionString);
-            }
+                var options = sp.GetRequiredService<IOptions<BlobStorageOptions>>().Value;
 
-            throw new InvalidOperationException(
-                "BlobStorage configuration is invalid. Provide either AccountUrl with UseManagedIdentity=true, or a ConnectionString for local development.");
-        });
+                if (options.UseManagedIdentity && !string.IsNullOrEmpty(options.AccountUrl))
+                {
+                    return new BlobServiceClient(new Uri(options.AccountUrl), new DefaultAzureCredential());
+                }
 
-        // Register storage
-        services.AddSingleton<IPayslipStorageService, BlobPayslipRepository>();
+                if (!string.IsNullOrEmpty(options.ConnectionString))
+                {
+                    return new BlobServiceClient(options.ConnectionString);
+                }
+
+                throw new InvalidOperationException(
+                    "BlobStorage configuration is invalid. Provide either AccountUrl with UseManagedIdentity=true, or a ConnectionString for local development.");
+            });
+
+            services.AddSingleton<IPayslipStorageService, BlobPayslipRepository>();
+        }
 
         // Register event processor
         services.AddScoped<IPayslipEventProcessor, PayslipEventProcessor>();

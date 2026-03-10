@@ -23,6 +23,14 @@ public class BlobStorageOptions
     public bool UseManagedIdentity { get; set; } = true;
 
     /// <summary>
+    /// When true, the BlobServiceClient authenticates using the signed-in user's identity
+    /// (via on-behalf-of / auth code flow). This enables per-user Azure RBAC on containers.
+    /// Takes precedence over <see cref="UseManagedIdentity"/> and <see cref="ConnectionString"/>.
+    /// Requires the Web app to call EnableTokenAcquisitionToCallDownstreamApi().
+    /// </summary>
+    public bool UseUserDelegatedAccess { get; set; }
+
+    /// <summary>
     /// Connection string for local development only. Do not use in production.
     /// </summary>
     public string? ConnectionString { get; set; }
