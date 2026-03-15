@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Web;
 using PayslipsManager.Application.Interfaces;
 using System.Security.Claims;
 
@@ -9,8 +12,11 @@ namespace PayslipsManager.Web.Controllers;
 /// Controller for managing employee payslips.
 /// </summary>
 [Authorize]
+[AuthorizeForScopes(Scopes = ["https://storage.azure.com/user_impersonation"])]
 public class PayslipsController : Controller
 {
+    private static readonly string[] StorageScopes = ["https://storage.azure.com/user_impersonation"];
+
     private readonly IPayslipQueryService _queryService;
     private readonly IPayslipDownloadService _downloadService;
     private readonly ILogger<PayslipsController> _logger;
@@ -40,12 +46,19 @@ public class PayslipsController : Controller
 
         _logger.LogInformation("Fetching payslips for employee {EmployeeId}", employeeId);
 
-        var payslips = await _queryService.GetPayslipsForEmployeeAsync(employeeId, cancellationToken);
+        try
+        {
+            var payslips = await _queryService.GetPayslipsForEmployeeAsync(employeeId, cancellationToken);
 
-        ViewData["UserEmail"] = User.FindFirstValue("preferred_username") ?? User.FindFirstValue(ClaimTypes.Email);
-        ViewData["UserName"] = User.Identity?.Name ?? "User";
+            ViewData["UserEmail"] = User.FindFirstValue("preferred_username") ?? User.FindFirstValue(ClaimTypes.Email);
+            ViewData["UserName"] = User.Identity?.Name ?? "User";
 
-        return View(payslips);
+            return View(payslips);
+        }
+        catch (Exception ex) when (IsConsentOrReauthRequired(ex))
+        {
+            return ReauthenticateChallenge();
+        }
     }
 
     /// <summary>
@@ -68,30 +81,37 @@ public class PayslipsController : Controller
 
         _logger.LogInformation("Employee {EmployeeId} downloading payslip {BlobName}", employeeId, id);
 
-        // Check if the payslip is archived before attempting download
-        var payslip = await _queryService.GetPayslipDetailsAsync(employeeId, id, cancellationToken);
-        if (payslip == null)
+        try
         {
-            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
-            return NotFound();
-        }
+            // Check if the payslip is archived before attempting download
+            var payslip = await _queryService.GetPayslipDetailsAsync(employeeId, id, cancellationToken);
+            if (payslip == null)
+            {
+                _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
+                return NotFound();
+            }
 
-        if (payslip.IsArchived)
+            if (payslip.IsArchived)
+            {
+                _logger.LogWarning("Employee {EmployeeId} attempted to download archived payslip {BlobName}", employeeId, id);
+                TempData["Error"] = "This payslip is in the Archive tier and cannot be downloaded directly. A restore is required before the file becomes available.";
+                return RedirectToAction(nameof(Details), new { id });
+            }
+
+            var stream = await _downloadService.DownloadAsync(employeeId, id, cancellationToken);
+
+            if (stream == null)
+            {
+                _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
+                return NotFound();
+            }
+
+            return File(stream, "application/pdf", $"payslip_{id}");
+        }
+        catch (Exception ex) when (IsConsentOrReauthRequired(ex))
         {
-            _logger.LogWarning("Employee {EmployeeId} attempted to download archived payslip {BlobName}", employeeId, id);
-            TempData["Error"] = "This payslip is in the Archive tier and cannot be downloaded directly. A restore is required before the file becomes available.";
-            return RedirectToAction(nameof(Details), new { id });
+            return ReauthenticateChallenge();
         }
-
-        var stream = await _downloadService.DownloadAsync(employeeId, id, cancellationToken);
-
-        if (stream == null)
-        {
-            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
-            return NotFound();
-        }
-
-        return File(stream, "application/pdf", $"payslip_{id}");
     }
 
     /// <summary>
@@ -114,15 +134,22 @@ public class PayslipsController : Controller
 
         _logger.LogInformation("Employee {EmployeeId} viewing details for payslip {BlobName}", employeeId, id);
 
-        var payslip = await _queryService.GetPayslipDetailsAsync(employeeId, id, cancellationToken);
-
-        if (payslip == null)
+        try
         {
-            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
-            return NotFound();
-        }
+            var payslip = await _queryService.GetPayslipDetailsAsync(employeeId, id, cancellationToken);
 
-        return View(payslip);
+            if (payslip == null)
+            {
+                _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
+                return NotFound();
+            }
+
+            return View(payslip);
+        }
+        catch (Exception ex) when (IsConsentOrReauthRequired(ex))
+        {
+            return ReauthenticateChallenge();
+        }
     }
 
     /// <summary>
@@ -145,15 +172,22 @@ public class PayslipsController : Controller
 
         _logger.LogInformation("Employee {EmployeeId} requesting download URL for payslip {BlobName}", employeeId, id);
 
-        var downloadUrl = await _downloadService.GenerateDownloadUrlAsync(employeeId, id, TimeSpan.FromMinutes(15), cancellationToken);
-
-        if (downloadUrl == null)
+        try
         {
-            _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
-            return NotFound();
-        }
+            var downloadUrl = await _downloadService.GenerateDownloadUrlAsync(employeeId, id, TimeSpan.FromMinutes(15), cancellationToken);
 
-        return Json(new { downloadUrl });
+            if (downloadUrl == null)
+            {
+                _logger.LogWarning("Payslip {BlobName} not found or unauthorized for employee {EmployeeId}", id, employeeId);
+                return NotFound();
+            }
+
+            return Json(new { downloadUrl });
+        }
+        catch (Exception ex) when (IsConsentOrReauthRequired(ex))
+        {
+            return ReauthenticateChallenge();
+        }
     }
 
     private string? GetEmployeeId()
@@ -161,5 +195,21 @@ public class PayslipsController : Controller
         // Use the Entra Object ID (oid claim) as the employee identifier
         return User.FindFirstValue("http://schemas.microsoft.com/identity/claims/objectidentifier")
                ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+    }
+
+    private static bool IsConsentOrReauthRequired(Exception ex)
+    {
+        return ex is MicrosoftIdentityWebChallengeUserException
+            || ex.InnerException is MicrosoftIdentityWebChallengeUserException;
+    }
+
+    private ChallengeResult ReauthenticateChallenge()
+    {
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = Request.Path + Request.QueryString
+        };
+        properties.SetParameter("scope", StorageScopes);
+        return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme);
     }
 }

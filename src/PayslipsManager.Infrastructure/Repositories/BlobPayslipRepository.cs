@@ -48,8 +48,6 @@ public partial class BlobPayslipRepository : IPayslipStorageService
         ArgumentException.ThrowIfNullOrWhiteSpace(employeeId);
 
         var sanitized = employeeId.ToLowerInvariant();
-        if (!string.IsNullOrEmpty(_options.ContainerPrefix))
-            return $"{_options.ContainerPrefix}-{sanitized}";
         return sanitized;
     }
 

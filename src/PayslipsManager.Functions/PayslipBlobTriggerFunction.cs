@@ -80,8 +80,8 @@ public class PayslipBlobCreatedFunction
         if (employeeId is null)
         {
             _logger.LogWarning(
-                "Container '{Container}' does not match prefix '{Prefix}-'. Not a payslip container -- skipping.",
-                containerName, _options.ContainerPrefix);
+                "Container '{Container}' does not match. Not a payslip container -- skipping.",
+                containerName);
             return;
         }
 
@@ -118,13 +118,7 @@ public class PayslipBlobCreatedFunction
     /// </summary>
     private string? ResolveEmployeeId(string containerName)
     {
-        var prefix = $"{_options.ContainerPrefix}-";
-        if (containerName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
-            containerName.Length > prefix.Length)
-        {
-            return containerName[prefix.Length..];
-        }
-        return null;
+        return containerName;
     }
 
     /// <summary>

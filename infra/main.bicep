@@ -68,7 +68,7 @@ module storageAccount 'modules/storage-account.bicep' = {
   }
 }
 
-// App Service Plan (shared by Web App and Function App)
+// App Service Plan for Web App
 module appServicePlan 'modules/app-service-plan.bicep' = {
   name: 'appServicePlan'
   scope: rg
@@ -105,23 +105,9 @@ module functionApp 'modules/function-app.bicep' = {
     name: 'func-${resourceToken}'
     location: location
     tags: union(tags, { 'azd-service-name': 'functions' })
-    appServicePlanId: appServicePlan.outputs.id
     applicationInsightsConnectionString: applicationInsights.outputs.connectionString
-    storageAccountName: storageAccount.outputs.name
     storageAccountBlobEndpoint: storageAccount.outputs.blobEndpoint
     containerPrefix: containerPrefix
-  }
-}
-
-// Role assignments: Web App managed identity -> Storage Blob Data Reader
-module webAppBlobRole 'modules/role-assignment.bicep' = {
-  name: 'webAppBlobRole'
-  scope: rg
-  params: {
-    principalId: webApp.outputs.identityPrincipalId
-    roleDefinitionId: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1' // Storage Blob Data Reader
-    storageAccountName: storageAccount.outputs.name
-    principalType: 'ServicePrincipal'
   }
 }
 
@@ -137,28 +123,7 @@ module functionAppBlobRole 'modules/role-assignment.bicep' = {
   }
 }
 
-// Role assignments: Function App managed identity -> Storage Account Contributor (for AzureWebJobsStorage)
-module functionAppStorageRole 'modules/role-assignment.bicep' = {
-  name: 'functionAppStorageRole'
-  scope: rg
-  params: {
-    principalId: functionApp.outputs.identityPrincipalId
-    roleDefinitionId: '17d1049b-9a84-46fb-8f53-869881c3d3ab' // Storage Account Contributor
-    storageAccountName: storageAccount.outputs.name
-    principalType: 'ServicePrincipal'
-  }
-}
 
-// Event Grid subscription for BlobCreated events
-module eventGridSubscription 'modules/event-grid.bicep' = {
-  name: 'eventGridSubscription'
-  scope: rg
-  params: {
-    storageAccountName: storageAccount.outputs.name
-    functionAppId: functionApp.outputs.id
-    containerPrefix: containerPrefix
-  }
-}
 
 // Outputs required by azd
 output AZURE_LOCATION string = location

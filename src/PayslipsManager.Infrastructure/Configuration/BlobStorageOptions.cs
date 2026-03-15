@@ -13,11 +13,6 @@ public class BlobStorageOptions
     public string AccountUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Prefix for employee containers. Each employee container is named {ContainerPrefix}-{employeeId}.
-    /// </summary>
-    public string ContainerPrefix { get; set; } = "payslips";
-
-    /// <summary>
     /// Use managed identity (DefaultAzureCredential) for authentication.
     /// </summary>
     public bool UseManagedIdentity { get; set; } = true;

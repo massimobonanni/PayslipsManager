@@ -11,6 +11,11 @@ namespace PayslipsManager.Infrastructure.Services;
 /// </summary>
 internal sealed class UserDelegatedTokenCredential : TokenCredential
 {
+    // Use explicit scopes matching what was consented during sign-in.
+    // The Azure SDK passes "https://storage.azure.com/.default" which may not
+    // match cached tokens acquired for "user_impersonation" during OIDC flow.
+    private static readonly string[] StorageScopes = ["https://storage.azure.com/user_impersonation"];
+
     private readonly ITokenAcquisition _tokenAcquisition;
 
     public UserDelegatedTokenCredential(ITokenAcquisition tokenAcquisition)
@@ -27,7 +32,7 @@ internal sealed class UserDelegatedTokenCredential : TokenCredential
         TokenRequestContext requestContext, CancellationToken cancellationToken)
     {
         var result = await _tokenAcquisition.GetAuthenticationResultForUserAsync(
-            requestContext.Scopes, tokenAcquisitionOptions: new TokenAcquisitionOptions
+            StorageScopes, tokenAcquisitionOptions: new TokenAcquisitionOptions
             {
                 CancellationToken = cancellationToken
             });
